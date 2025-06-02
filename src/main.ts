@@ -1,3 +1,5 @@
+// Importar o fix do crypto antes de tudo
+import './cron/schedule-fix';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import * as dotenv from 'dotenv';
