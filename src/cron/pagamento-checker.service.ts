@@ -12,7 +12,7 @@ export class PagamentoCheckerService {
 
     const headers = {
       Authorization:
-        'MTc3ZjRmNjYtZmY2ZC00MmMyLTgwOTItODdiYzFhN2UzYTYxOjU2ZWYzMGI1LWI0ZmMtNGI1OC05MDEyLWY4OGM2NGM1Zjc4MA==',
+        'MzlkZmQxOGUtNmEyOC00ODllLThjNGYtMDJmOGNmYTlhZTk1OjEyNzgzYjU2LTU5ODktNGE0NS1hNDE1LTJiNjE4ZDZmOGZmNg==',
       'Content-Type': 'application/json',
     };
 
@@ -39,6 +39,16 @@ export class PagamentoCheckerService {
 
     for (const deposito of depositos) {
       try {
+        // Verificar se o txid é válido
+        if (!deposito.txid) {
+          this.logger.warn(`Depósito ID ${deposito.id} possui txid nulo. Atualizando para status de erro.`);
+          await supabase
+            .from('depositos')
+            .update({ status: 3 })
+            .eq('id', deposito.id);
+          continue;
+        }
+
         const criadoEm = new Date(deposito.created_at);
         const agora = new Date();
         const diffMs = agora.getTime() - criadoEm.getTime();
@@ -103,7 +113,7 @@ export class PagamentoCheckerService {
             this.logger.log(`✅ Pagamento confirmado e extrato registrado: ${deposito.txid}`);
           }
       } catch (err) {
-        this.logger.warn(`Erro ao verificar txid ${deposito.txid}`);
+        this.logger.warn(`Erro ao verificar txid ${deposito.txid}: ${err.message}`);
       }
     }
   }

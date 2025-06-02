@@ -18,12 +18,24 @@ export class PagamentoService {
   }
 
   async generateQRCode(userId: string, valor: number, cpf: string, metodo: number) {
-    // 1. Buscar nome
-    const { data: user, error } = await supabase
+    // 1. Buscar nome - tenta primeiro pelo campo user_id
+    let { data: user, error } = await supabase
       .from('profiles')
-      .select('first_name')
-      .eq('id', userId)
+      .select('nome')
+      .eq('user_id', userId)
       .single();
+    
+    // Se não encontrou pelo user_id, tenta pelo id
+    if (error || !user) {
+      const result = await supabase
+        .from('profiles')
+        .select('nome')
+        .eq('id', userId)
+        .single();
+      
+      user = result.data;
+      error = result.error;
+    }
   
     if (error || !user) {
       throw new NotFoundException('Usuário não encontrado no Supabase');
@@ -40,7 +52,7 @@ export class PagamentoService {
   
     const data = {
       value_cents: Math.round(valor * 100),
-      generator_name: user.first_name,
+      generator_name: user.nome,
       generator_document: cpf,
       expiration_time: '1800',
       external_reference: 'OWNER-PAYMENTS',
