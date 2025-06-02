@@ -9,16 +9,13 @@ dotenv.config();
 export class BonusService {
   private supabase;
 
-  // Porcentagens de comissão por nível
+  // Porcentagens de comissão por nível - ajustadas conforme solicitado
   private porcentagens = {
-    1: 13,
-    2: 5,
-    3: 4,
-    4: 3,
-    5: 2,
-    6: 1,
-    7: 1,
-    8: 1,
+    1: 10, // Indicação direta - 10%
+    2: 4,  // 2° nível - 4%
+    3: 3,  // 3° nível - 3%
+    4: 2,  // 4° nível - 2%
+    5: 1,  // 5° nível - 1%
   };
 
   constructor() {
@@ -45,21 +42,21 @@ export class BonusService {
       let valorDeposito = deposito.value;
       let nivel = 1;
 
-      while (nivel <= 8) {
+      while (nivel <= 5) { // Agora só vai até o nível 5
         // Busca o usuário que fez o depósito
         const { data: user } = await this.supabase
           .from('profiles')
-          .select('referrer_username')
+          .select('referred_at')
           .eq('id', userId)
           .single();
 
-        if (!user?.referrer_username) break; // se não há quem indicou, fim da bonificação
+        if (!user?.referred_at) break; // se não há quem indicou, fim da bonificação
 
         // Busca o ID do usuário indicador pelo username
         const { data: referrer } = await this.supabase
           .from('profiles')
           .select('id')
-          .eq('username', user.referrer_username)
+          .eq('id', user.referred_at)
           .single();
           
         if (!referrer?.id) break; // se não encontrou o indicador, fim da bonificação
@@ -72,21 +69,20 @@ export class BonusService {
         // Buscar nome do usuário que depositou para usar na descrição
         const { data: quemDepositou } = await this.supabase
           .from('profiles')
-          .select('first_name')
+          .select('nome')
           .eq('id', deposito.profile_id)
           .single();
 
-        const nomeUsuario = quemDepositou?.first_name ?? 'usuário desconhecido';
+        const nomeUsuario = quemDepositou?.nome ?? 'usuário desconhecido';
 
-        // Criar registro na tabela transactions
-        await this.supabase.from('transactions').insert([
+        // Criar registro na tabela extrato
+        await this.supabase.from('extrato').insert([
           {
-            user_id: refId,
-            reference_id: userId,
-            amount: comissao,
-            type: nivel === 1 ? 'level1_bonus' : 'multilevel_bonus',
+            profile_id: refId,
+            value: comissao,
+            type: nivel === 1 ? 'bonus_direto' : 'bonus_indireto',
             status: 'completed',
-            description: `Bônus nível ${nivel} gerado pelo depósito de ${nomeUsuario}`,
+            descricao: `Bônus nível ${nivel} gerado pelo depósito de ${nomeUsuario}`,
             created_at: timestamp,
             updated_at: timestamp,
           },

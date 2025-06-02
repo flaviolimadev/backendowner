@@ -51,7 +51,7 @@ export class SaqueCronService {
           
           const { data: profileById, error: errorById } = await supabase
             .from('profiles')
-            .select('name')
+            .select('nome')
             .eq('id', saque.profile_id)
             .single();
             
@@ -61,7 +61,7 @@ export class SaqueCronService {
             // Se não encontrou pelo id, tenta pelo user_id
             const { data: profileByUserId, error: errorByUserId } = await supabase
               .from('profiles')
-              .select('name')
+              .select('nome')
               .eq('user_id', saque.profile_id)
               .single();
               
@@ -81,8 +81,8 @@ export class SaqueCronService {
           const dataPix = {
             initiation_type: 'dict',
             idempotent_id: idempotentId,
-            receiver_name: profileData.name,
-            receiver_document: saque.cpf, // Vem do banco agora
+            receiver_name: profileData.nome,
+            receiver_document: saque.cpf,
             value_cents: saqueCents,
             pix_key_type,
             pix_key: saque.carteira,
@@ -103,36 +103,47 @@ export class SaqueCronService {
           if (response.data && response.data.payment) {
             await supabase.from('saques').update({ status: 1 }).eq('id', saque.id);
 
-            await supabase.from('transactions').insert({
-              user_id: saque.profile_id,
-              amount: saque.value,
-              type: 'withdrawal',
+            // Registrar na tabela extrato em vez de transactions
+            await supabase.from('extrato').insert({
+              profile_id: saque.profile_id,
+              value: saque.value,
+              type: 'saque',
               status: 'completed',
-              description: 'Saque Pix realizado com sucesso',
-              reference_id: saque.id,
+              descricao: 'Saque Pix realizado com sucesso'
             });
 
-            this.logger.log(`✅ Saque Pix efetuado para ${profileData.name}: ${saque.value / 100} USD`);
+            this.logger.log(`✅ Saque Pix efetuado para ${profileData.nome}: ${saque.value} USD`);
           } else {
             throw new Error('Resposta inválida da API PrimePag');
           }
         } catch (err) {
           this.logger.warn(`❌ Falha ao processar saque ID ${saque.id}: ${err.message}`);
 
-          await supabase.rpc('incrementar_balance', {
-            uid: saque.profile_id,
-            quantia: saque.value,
-          });
+          // Atualizar diretamente o saldo na tabela profiles em vez de usar a função RPC
+          const { data: userData, error: userError } = await supabase
+            .from('profiles')
+            .select('balance')
+            .eq('id', saque.profile_id)
+            .single();
+            
+          if (!userError && userData) {
+            await supabase
+              .from('profiles')
+              .update({ 
+                balance: userData.balance + saque.value 
+              })
+              .eq('id', saque.profile_id);
+          }
 
           await supabase.from('saques').update({ status: 2 }).eq('id', saque.id);
 
-          await supabase.from('transactions').insert({
-            user_id: saque.profile_id,
-            amount: saque.value,
-            type: 'withdrawal',
+          // Registrar falha na tabela extrato
+          await supabase.from('extrato').insert({
+            profile_id: saque.profile_id,
+            value: saque.value,
+            type: 'saque',
             status: 'failed',
-            description: 'Erro ao processar saque Pix',
-            reference_id: saque.id,
+            descricao: 'Erro ao processar saque Pix'
           });
         }
       }

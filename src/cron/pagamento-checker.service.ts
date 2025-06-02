@@ -81,14 +81,13 @@ export class PagamentoCheckerService {
               .update({ status: 1 })
               .eq('id', deposito.id);
           
-            // Cria o registro na tabela transactions
-            await supabase.from('transactions').insert({
-              user_id: deposito.profile_id,
-              amount: deposito.value,
-              type: 'deposit',
+            // Cria o registro na tabela extrato (em vez de transactions)
+            await supabase.from('extrato').insert({
+              profile_id: deposito.profile_id,
+              value: deposito.value,
+              type: 'deposito',
               status: 'completed',
-              description: 'Depósito confirmado via Pix',
-              reference_id: deposito.txid,
+              descricao: 'Depósito confirmado via Pix'
             });
 
             // Atualiza o balance_invest do usuário
