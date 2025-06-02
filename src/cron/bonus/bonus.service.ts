@@ -8,6 +8,7 @@ dotenv.config();
 @Injectable()
 export class BonusService {
   private supabase;
+  private isProcessing = false; // Flag para controlar execução simultânea
 
   // Porcentagens de comissão por nível - ajustadas conforme solicitado
   private porcentagens = {
@@ -28,89 +29,149 @@ export class BonusService {
 
   @Cron('*/1 * * * *') // Executa a cada 1 minuto
   async gerarBonusMultinivel() {
-    const { data: depositos, error } = await this.supabase
-      .from('depositos')
-      .select('id, profile_id, value')
-      .eq('status', 1);
-
-    if (error) throw new Error(error.message);
-    const timestamp = new Date().toISOString();
-
-    for (const deposito of depositos) {
-      let userId = deposito.profile_id;
-      let depositoId = deposito.id;
-      let valorDeposito = deposito.value;
-      let nivel = 1;
-
-      while (nivel <= 5) { // Agora só vai até o nível 5
-        // Busca o usuário que fez o depósito
-        const { data: user } = await this.supabase
-          .from('profiles')
-          .select('referred_at')
-          .eq('id', userId)
-          .single();
-
-        if (!user?.referred_at) break; // se não há quem indicou, fim da bonificação
-
-        // Busca o ID do usuário indicador pelo username
-        const { data: referrer } = await this.supabase
-          .from('profiles')
-          .select('id')
-          .eq('id', user.referred_at)
-          .single();
-          
-        if (!referrer?.id) break; // se não encontrou o indicador, fim da bonificação
-        
-        const refId = referrer.id;
-        const percentual = this.porcentagens[nivel];
-        const comissao = Math.floor(valorDeposito * (percentual / 100));
-        const tipo = nivel === 1 ? 2 : 3;
-
-        // Buscar nome do usuário que depositou para usar na descrição
-        const { data: quemDepositou } = await this.supabase
-          .from('profiles')
-          .select('nome')
-          .eq('id', deposito.profile_id)
-          .single();
-
-        const nomeUsuario = quemDepositou?.nome ?? 'usuário desconhecido';
-
-        // Criar registro na tabela extrato
-        await this.supabase.from('extrato').insert([
-          {
-            profile_id: refId,
-            value: comissao,
-            type: nivel === 1 ? 'bonus_direto' : 'bonus_indireto',
-            status: 'completed',
-            descricao: `Bônus nível ${nivel} gerado pelo depósito de ${nomeUsuario}`,
-            created_at: timestamp,
-            updated_at: timestamp,
-          },
-        ]);
-
-        // Atualizar saldo do referido
-        const { data: saldoAtual } = await this.supabase
-          .from('profiles')
-          .select('balance')
-          .eq('id', refId)
-          .single();
-
-        await this.supabase
-          .from('profiles')
-          .update({ balance: saldoAtual.balance + comissao })
-          .eq('id', refId);
-
-        userId = refId;
-        nivel++;
-      }
-
-      // Finaliza o processamento do depósito
-      await this.supabase
-        .from('depositos')
-        .update({ status: 2, updated_at: timestamp })
-        .eq('id', depositoId);
+    // Evitar execução simultânea
+    if (this.isProcessing) {
+      console.log('Já existe um processamento de bônus em andamento. Pulando execução.');
+      return;
     }
 
-    console.log(`[Cron] Bonificações processadas às ${new Date().toLocaleString()}`);
+    try {
+      this.isProcessing = true; // Sinaliza que iniciou o processamento
+      console.log('Iniciando processamento de bônus');
+      
+      const { data: depositos, error } = await this.supabase
+        .from('depositos')
+        .select('id, profile_id, value')
+        .eq('status', 1);
+
+      if (error) {
+        console.error('Erro ao buscar depósitos:', error.message);
+        return;
+      }
+
+      if (!depositos || depositos.length === 0) {
+        console.log('Nenhum depósito pendente');
+        return;
+      }
+
+      console.log(`Encontrados ${depositos.length} depósitos para processamento`);
+      const timestamp = new Date().toISOString();
+
+      for (const deposito of depositos) {
+        try {
+          console.log(`Processando depósito ID: ${deposito.id}`);
+          
+          let userId = deposito.profile_id;
+          let depositoId = deposito.id;
+          let valorDeposito = deposito.value;
+          let nivel = 1;
+
+          while (nivel <= 5) {
+            // Busca o usuário que fez o depósito
+            const { data: user, error: userError } = await this.supabase
+              .from('profiles')
+              .select('referred_at')
+              .eq('id', userId)
+              .single();
+
+            if (userError || !user?.referred_at) {
+              console.log(`Nível ${nivel}: Fim da cadeia para usuário ${userId}`);
+              break;
+            }
+
+            // Busca o ID do usuário indicador pelo user_id
+            const { data: referrer, error: referrerError } = await this.supabase
+              .from('profiles')
+              .select('id')
+              .eq('user_id', user.referred_at)
+              .single();
+              
+            if (referrerError || !referrer?.id) {
+              console.log(`Nível ${nivel}: Indicador não encontrado para ${user.referred_at}`);
+              break;
+            }
+            
+            const refId = referrer.id;
+            const percentual = this.porcentagens[nivel];
+            const comissao = Math.floor(valorDeposito * (percentual / 100));
+            
+            console.log(`Nível ${nivel}: Comissão de ${comissao} para usuário ${refId}`);
+
+            // Buscar nome do usuário que depositou para usar na descrição
+            const { data: quemDepositou } = await this.supabase
+              .from('profiles')
+              .select('nome')
+              .eq('id', deposito.profile_id)
+              .single();
+
+            const nomeUsuario = quemDepositou?.nome ?? 'usuário desconhecido';
+            
+            // EXTRATO - inserção com type corrigido
+            const extratoData = {
+              profile_id: refId,
+              value: comissao,
+              type: 'deposito',
+              status: 'completed',
+              descricao: `Bônus nível ${nivel} de ${nomeUsuario}`,
+              created_at: timestamp,
+              updated_at: timestamp,
+              reference_id: deposito.id
+            };
+            
+            const { error: extratoError } = await this.supabase
+              .from('extrato')
+              .insert([extratoData]);
+
+            if (extratoError) {
+              console.error(`Erro ao inserir no extrato: ${extratoError.message}`);
+            } else {
+              console.log(`Extrato criado para usuário ${refId}`);
+            }
+
+            // SALDO - atualização simplificada
+            const { data: perfilAtual } = await this.supabase
+              .from('profiles')
+              .select('balance')
+              .eq('id', refId)
+              .single();
+            
+            if (perfilAtual) {
+              const novoSaldo = (perfilAtual.balance || 0) + comissao;
+              
+              const { error: updateError } = await this.supabase
+                .from('profiles')
+                .update({ balance: novoSaldo })
+                .eq('id', refId);
+
+              if (updateError) {
+                console.error(`Erro ao atualizar saldo: ${updateError.message}`);
+              } else {
+                console.log(`Saldo atualizado para ${novoSaldo}`);
+              }
+            }
+
+            userId = refId;
+            nivel++;
+          }
+
+          // Marca o depósito como processado
+          await this.supabase
+            .from('depositos')
+            .update({ status: 2 })
+            .eq('id', depositoId);
+          
+          console.log(`Depósito ${depositoId} finalizado`);
+        } catch (err) {
+          console.error(`Erro ao processar depósito ${deposito.id}:`, err);
+        }
+      }
+
+      console.log(`Processamento de bonificações concluído às ${new Date().toLocaleString()}`);
+    } catch (error) {
+      console.error('Erro geral no processamento de bônus:', error);
+    } finally {
+      // Sempre libera o bloqueio no final, mesmo em caso de erro
+      this.isProcessing = false;
+    }
   }
 }

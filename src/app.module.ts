@@ -8,10 +8,7 @@ import { AutomacaoModule } from './automacao/automacao.module';
 import { OperacoesModule } from './operacoes/operacoes.module';
 import { RendimentoModule } from './rendimento/rendimento.module';
 import { RedeModule } from './rede/rede.module';
-import { BonusService } from './cron/bonus/bonus.service';
 import { CronModule } from './cron/bonus/cron.module';
-import { PagamentoCheckerService } from './cron/pagamento-checker.service';
-import { SaqueCronService } from './cron/saque-cron.service';
 
 @Module({
   imports: [
@@ -26,10 +23,7 @@ import { SaqueCronService } from './cron/saque-cron.service';
   ],
   controllers: [AppController],
   providers: [
-    AppService, 
-    BonusService,
-    PagamentoCheckerService,
-    SaqueCronService
+    AppService
   ],
 })
 export class AppModule {}
