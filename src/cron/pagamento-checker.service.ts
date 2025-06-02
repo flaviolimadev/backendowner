@@ -98,16 +98,36 @@ export class PagamentoCheckerService {
             .single();
 
             if (!perfilError && perfil) {
-            const novoBalance = (perfil.balance_invest || 0) + deposito.value;
+              const novoBalance = (perfil.balance_invest || 0) + deposito.value;
 
-            await supabase
-            .from('profiles')
-            .update({ balance_invest: novoBalance })
-            .eq('id', deposito.profile_id);
+              await supabase
+              .from('profiles')
+              .update({ balance_invest: novoBalance })
+              .eq('id', deposito.profile_id);
 
-            this.logger.log(`💰 Balance_invest atualizado para usuário ${deposito.profile_id}`);
+              this.logger.log(`💰 Balance_invest atualizado para usuário ${deposito.profile_id}`);
             }
 
+            // Criar um novo contrato
+            const timestamp = new Date().toISOString();
+            const { data: contrato, error: contratoError } = await supabase
+              .from('contratos')
+              .insert({
+                profile_id: deposito.profile_id,
+                value: deposito.value,
+                status: 'ativo',
+                ganhos: 0,
+                created_at: timestamp,
+                updated_at: timestamp
+              })
+              .select('id')
+              .single();
+            
+            if (contratoError) {
+              this.logger.error(`❌ Erro ao criar contrato: ${contratoError.message}`);
+            } else {
+              this.logger.log(`✅ Contrato criado com sucesso: ${contrato.id}`);
+            }
           
             this.logger.log(`✅ Pagamento confirmado e extrato registrado: ${deposito.txid}`);
           }
