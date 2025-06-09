@@ -8,18 +8,17 @@ dotenv.config();
 @Injectable()
 export class BonusService {
   private supabase;
-  private isProcessing = false; // Flag para controlar execução simultânea
+  private isProcessing = false;
 
-  // Porcentagens de comissão por nível - ajustadas conforme solicitado
   private porcentagens = {
-    1: 10, // Indicação direta - 10%
-    2: 5,  // 2° nível - 4%
-    3: 4,  // 3° nível - 3%
-    4: 2,  // 4° nível - 2%
-    5: 2,  // 5° nível - 1%
-    6: 1,  // 5° nível - 1%
-    7: 1,  // 5° nível - 1%
-    8: 1,  // 5° nível - 1%
+    1: 10,
+    2: 5,
+    3: 4,
+    4: 2,
+    5: 2,
+    6: 1,
+    7: 1,
+    8: 1,
   };
 
   constructor() {
@@ -30,16 +29,15 @@ export class BonusService {
     this.supabase = createClient(url, key);
   }
 
-  @Cron('*/1 * * * *') // Executa a cada 1 minuto
+  @Cron('*/1 * * * *')
   async gerarBonusMultinivel() {
-    // Evitar execução simultânea
     if (this.isProcessing) {
       console.log('Já existe um processamento de bônus em andamento. Pulando execução.');
       return;
     }
 
     try {
-      this.isProcessing = true; // Sinaliza que iniciou o processamento
+      this.isProcessing = true;
       console.log('Iniciando processamento de bônus');
       
       const { data: depositos, error } = await this.supabase
@@ -69,8 +67,7 @@ export class BonusService {
           let valorDeposito = deposito.value;
           let nivel = 1;
 
-          while (nivel <= 5) {
-            // Busca o usuário que fez o depósito
+          while (nivel <= 8) {
             const { data: user, error: userError } = await this.supabase
               .from('profiles')
               .select('referred_at')
@@ -82,7 +79,6 @@ export class BonusService {
               break;
             }
 
-            // Busca o ID do usuário indicador pelo user_id
             const { data: referrer, error: referrerError } = await this.supabase
               .from('profiles')
               .select('id')
@@ -96,11 +92,10 @@ export class BonusService {
             
             const refId = referrer.id;
             const percentual = this.porcentagens[nivel];
-            const comissao = Math.floor(valorDeposito * (percentual / 100));
-            
-            console.log(`Nível ${nivel}: Comissão de ${comissao} para usuário ${refId}`);
+            const comissao = Math.floor(valorDeposito * (percentual / 100) * 100); // EM CENTAVOS
 
-            // Buscar nome do usuário que depositou para usar na descrição
+            console.log(`Nível ${nivel}: Comissão de ${comissao} centavos para usuário ${refId}`);
+
             const { data: quemDepositou } = await this.supabase
               .from('profiles')
               .select('nome')
@@ -109,7 +104,6 @@ export class BonusService {
 
             const nomeUsuario = quemDepositou?.nome ?? 'usuário desconhecido';
             
-            // EXTRATO - inserção com type corrigido
             const extratoData = {
               profile_id: refId,
               value: comissao,
@@ -131,7 +125,6 @@ export class BonusService {
               console.log(`Extrato criado para usuário ${refId}`);
             }
 
-            // SALDO - atualização simplificada
             const { data: perfilAtual } = await this.supabase
               .from('profiles')
               .select('balance')
@@ -149,7 +142,7 @@ export class BonusService {
               if (updateError) {
                 console.error(`Erro ao atualizar saldo: ${updateError.message}`);
               } else {
-                console.log(`Saldo atualizado para ${novoSaldo}`);
+                console.log(`Saldo atualizado para ${novoSaldo} centavos`);
               }
             }
 
@@ -157,7 +150,6 @@ export class BonusService {
             nivel++;
           }
 
-          // Marca o depósito como processado
           await this.supabase
             .from('depositos')
             .update({ status: 2 })
@@ -173,7 +165,6 @@ export class BonusService {
     } catch (error) {
       console.error('Erro geral no processamento de bônus:', error);
     } finally {
-      // Sempre libera o bloqueio no final, mesmo em caso de erro
       this.isProcessing = false;
     }
   }
