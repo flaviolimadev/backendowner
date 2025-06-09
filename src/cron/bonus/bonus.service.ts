@@ -13,10 +13,13 @@ export class BonusService {
   // Porcentagens de comissão por nível - ajustadas conforme solicitado
   private porcentagens = {
     1: 10, // Indicação direta - 10%
-    2: 4,  // 2° nível - 4%
-    3: 3,  // 3° nível - 3%
+    2: 5,  // 2° nível - 4%
+    3: 4,  // 3° nível - 3%
     4: 2,  // 4° nível - 2%
-    5: 1,  // 5° nível - 1%
+    5: 2,  // 5° nível - 1%
+    6: 1,  // 5° nível - 1%
+    7: 1,  // 5° nível - 1%
+    8: 1,  // 5° nível - 1%
   };
 
   constructor() {
