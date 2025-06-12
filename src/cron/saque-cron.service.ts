@@ -13,7 +13,7 @@ export class SaqueCronService {
 
     const headers = {
       Authorization:
-        'ODE2Y2YxZDEtYmFmYS00Y2M2LWJlYzctMTA1OGNiMTJlM2NkOmU1NzUxNjI1LTJlNGUtNDYzZS05YmRhLTUzNGZiMzE5MTBkYw==',
+        'NDNlOTE5ZDEtOTgzNC00OTMyLTk5ZDAtZjU5YjQwMmM0NmU0OjAxZjU5NTUxLWViZjgtNDZhZC04NTFmLWQ1ZWJjMjg3YzE3YQ==',
       'Content-Type': 'application/json',
     };
 
