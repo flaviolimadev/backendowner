@@ -63,13 +63,13 @@ export class PagamentoCheckerService {
           const diffMs = agora.getTime() - criadoEm.getTime();
           const diffHoras = diffMs / (1000 * 60 * 60);
 
-          // Se passou de 24 horas
-          if (diffHoras > 24) {
+          // Se passou de 1 hora
+          if (diffHoras > 1) {
             await supabase
               .from('depositos')
               .update({ status: 3 })
               .eq('id', deposito.id);
-            this.logger.log(`❌ Depósito expirado: ${deposito.txid}`);
+            this.logger.log(`❌ Depósito expirado (mais de 1h): ${deposito.txid}`);
             continue;
           }
 
@@ -93,7 +93,7 @@ export class PagamentoCheckerService {
               // Cria o registro na tabela extrato (em vez de transactions)
               await supabase.from('extrato').insert({
                 profile_id: deposito.profile_id,
-                value: deposito.value,
+                value: deposito.value * 100,
                 type: 'deposito',
                 status: 'completed',
                 descricao: 'Depósito confirmado via Pix'
@@ -107,7 +107,7 @@ export class PagamentoCheckerService {
               .single();
 
               if (!perfilError && perfil) {
-                const novoBalance = (perfil.balance_invest || 0) + deposito.value;
+                const novoBalance = (perfil.balance_invest || 0) + (deposito.value * 100);
 
                 await supabase
                 .from('profiles')
