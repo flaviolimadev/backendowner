@@ -66,10 +66,10 @@ export class PagamentoService {
     await supabase.from('depositos').insert({
       profile_id: userId,
       txid: txid,
-      value: Math.round((valor * 100)/6),
+      value: valor,
       type: metodo,
       status: 0, // pendente
-      descricao: 'Gerado via API',
+      descricao: 'Gerado pela API PrimePag',
       bonus: false,
     });
   
