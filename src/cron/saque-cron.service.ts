@@ -52,7 +52,7 @@ export class SaqueCronService {
           continue;
         }
 
-        const saqueCents = Math.floor(saque.value * 6);
+        const saqueCents = saque.value; // valor já em centavos
         const idempotentId = uuidv4().replace(/[^a-zA-Z0-9]/g, '');
 
         const pix_key_type = this.detectPixKeyType(saque.carteira);
