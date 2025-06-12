@@ -13,12 +13,7 @@ export class BonusService {
   private porcentagens = {
     1: 10,
     2: 5,
-    3: 4,
-    4: 2,
-    5: 2,
-    6: 1,
-    7: 1,
-    8: 1,
+    3: 4
   };
 
   constructor() {
