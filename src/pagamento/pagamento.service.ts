@@ -9,7 +9,7 @@ export class PagamentoService {
 
     const headers = {
       Authorization:
-        'ODE2Y2YxZDEtYmFmYS00Y2M2LWJlYzctMTA1OGNiMTJlM2NkOmU1NzUxNjI1LTJlNGUtNDYzZS05YmRhLTUzNGZiMzE5MTBkYw==',
+        'YWE1MThmNGMtZjM0Yi00ZjBmLWEwMTktM2RiYjQ4YmNlOWJkOjkwMTEwZjljLTg3YTEtNDhhMS1hMTgzLTIzOTg1NjdkMjIzMw==',
       'Content-Type': 'application/json',
     };
 
